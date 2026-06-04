@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DP World — PDF to Excel</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:       #0d1828;
+  --bg2:      #111f33;
+  --card:     #ffffff;
+  --blue:     #1F4E79;
+  --accent:   #2d8fd5;
+  --accent2:  #1a6faa;
+  --green:    #16a34a;
+  --red:      #dc2626;
+  --text:     #1a2740;
+  --muted:    #64748b;
+  --light:    #f1f5f9;
+  --border:   #e2e8f0;
+  --font: 'Segoe UI', system-ui, sans-serif;
+}
+
+html, body {
+  min-height: 100vh;
+  font-family: var(--font);
+  background: var(--bg);
+  color: #e8eef5;
+  font-size: 14px;
+}
+
+/* ── Layout ───────────────────────────────────────────────────────────────── */
+.page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 40px 20px 60px;
+}
+
+/* ── Mini header ──────────────────────────────────────────────────────────── */
+.topbar {
+  width: 100%;
+  max-width: 680px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 52px;
+}
+.brand {
+  display: flex; align-items: center; gap: 10px;
+}
+.brand-logo {
+  width: 30px; height: 30px; border-radius: 6px;
+  background: var(--accent);
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 900; font-size: 10px; color: #fff; letter-spacing: -.3px;
+}
+.brand-name { font-size: .82rem; font-weight: 700; color: rgba(255,255,255,.9); }
+.topbar-date { font-size: .7rem; color: rgba(255,255,255,.35); }
+
+/* ── Hero ─────────────────────────────────────────────────────────────────── */
+.hero { text-align: center; margin-bottom: 40px; }
+.hero h1 {
+  font-size: 2rem; font-weight: 800;
+  color: #fff;
+  letter-spacing: -.5px;
+  line-height: 1.15;
+  margin-bottom: 10px;
+}
+.hero p { font-size: .85rem; color: rgba(255,255,255,.45); letter-spacing: .2px; }
+
+/* ── Flow diagram ─────────────────────────────────────────────────────────── */
+.flow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  margin-bottom: 36px;
+}
+
+.flow-node { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+
+.flow-box {
+  width: 74px; height: 74px;
+  background: #162235;
+  border: 1px solid rgba(45,143,213,.2);
+  border-radius: 14px;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 4px;
+}
+.flow-box svg { opacity: .8; }
+.flow-box .fbox-ext {
+  font-size: .6rem; font-weight: 700; letter-spacing: .8px;
+  color: rgba(255,255,255,.5);
+}
+
+.flow-label { font-size: .72rem; font-weight: 600; color: rgba(255,255,255,.5); letter-spacing: .5px; }
+
+/* connector */
+.flow-conn {
+  display: flex; align-items: center; gap: 0;
+  margin: 0 -1px;
+  padding-bottom: 20px; /* align with box center */
+}
+.flow-line {
+  width: 36px; height: 2px;
+  background: linear-gradient(90deg, rgba(45,143,213,.15), rgba(45,143,213,.4));
+}
+.flow-pill {
+  width: 46px; height: 46px;
+  background: var(--bg2);
+  border: 1.5px solid rgba(45,143,213,.35);
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 900; font-size: 9px; color: var(--accent);
+  letter-spacing: .5px;
+  transition: box-shadow .3s;
+  flex-shrink: 0;
+}
+.flow.converting .flow-pill {
+  animation: pulse-ring .9s ease-in-out infinite;
+  border-color: var(--accent);
+  color: var(--accent);
+  box-shadow: 0 0 0 0 rgba(45,143,213,.4);
+}
+.flow.done .flow-pill {
+  background: rgba(22,163,74,.12);
+  border-color: rgba(22,163,74,.5);
+  color: #4ade80;
+  content: "✓";
+}
+
+@keyframes pulse-ring {
+  0%   { box-shadow: 0 0 0 0   rgba(45,143,213,.5); }
+  70%  { box-shadow: 0 0 0 10px rgba(45,143,213,0);  }
+  100% { box-shadow: 0 0 0 0   rgba(45,143,213,0);   }
+}
+
+/* ── Main card ────────────────────────────────────────────────────────────── */
+.card {
+  width: 100%;
+  max-width: 560px;
+  background: var(--card);
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0,0,0,.5), 0 1px 0 rgba(255,255,255,.06) inset;
+  overflow: hidden;
+  color: var(--text);
+}
+
+/* ── States ───────────────────────────────────────────────────────────────── */
+.state { display: none; padding: 40px 36px; }
+.state.active { display: block; }
+
+/* ── Upload state ─────────────────────────────────────────────────────────── */
+.drop-zone {
+  border: 2px dashed var(--border);
+  border-radius: 12px;
+  padding: 48px 24px 36px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color .2s, background .2s;
+  position: relative;
+}
+.drop-zone:hover, .drop-zone.drag-over {
+  border-color: var(--accent);
+  background: rgba(45,143,213,.04);
+}
+.drop-zone input {
+  position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+}
+.drop-icon {
+  font-size: 44px; margin-bottom: 16px; display: block;
+  filter: drop-shadow(0 2px 8px rgba(45,143,213,.3));
+}
+.drop-title {
+  font-size: 1.05rem; font-weight: 700; color: var(--text);
+  margin-bottom: 6px;
+}
+.drop-sub { font-size: .8rem; color: var(--muted); margin-bottom: 24px; }
+
+.btn-select {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: var(--blue);
+  color: #fff;
+  border: none; border-radius: 8px;
+  padding: 11px 24px; font-size: .85rem; font-weight: 700;
+  cursor: pointer; font-family: var(--font);
+  transition: background .15s, transform .1s;
+  position: relative; z-index: 1;
+}
+.btn-select:hover  { background: var(--accent2); transform: translateY(-1px); }
+.btn-select:active { transform: translateY(0); }
+
+/* ── Type select state ────────────────────────────────────────────────────── */
+.file-preview {
+  display: flex; align-items: center; gap: 12px;
+  background: var(--light); border-radius: 10px;
+  padding: 13px 16px; margin-bottom: 28px;
+}
+.fp-icon { font-size: 22px; flex-shrink: 0; }
+.fp-name { flex: 1; font-size: .85rem; font-weight: 600; color: var(--text); word-break: break-all; }
+.fp-size { font-size: .72rem; color: var(--muted); flex-shrink: 0; }
+
+.type-prompt {
+  text-align: center;
+  font-size: .95rem; font-weight: 700; color: var(--text);
+  margin-bottom: 18px;
+}
+.type-sub {
+  text-align: center;
+  font-size: .75rem; color: var(--muted);
+  margin-top: -12px; margin-bottom: 20px;
+}
+
+.type-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 20px; }
+.type-btn {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 8px; padding: 22px 16px;
+  background: #fff;
+  border: 2px solid var(--border);
+  border-radius: 12px; cursor: pointer;
+  font-family: var(--font);
+  transition: border-color .15s, background .15s, transform .1s, box-shadow .15s;
+}
+.type-btn:hover {
+  border-color: var(--accent);
+  background: rgba(45,143,213,.04);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(45,143,213,.15);
+}
+.type-btn:active { transform: translateY(0); }
+.tb-icon  { font-size: 28px; }
+.tb-code  { font-size: .82rem; font-weight: 800; color: var(--blue); letter-spacing: .5px; }
+.tb-label { font-size: .7rem; color: var(--muted); text-align: center; }
+
+.btn-back {
+  background: none; border: none; cursor: pointer;
+  font-family: var(--font); font-size: .78rem;
+  color: var(--muted); display: block; width: 100%;
+  text-align: center; padding: 6px;
+  transition: color .15s;
+}
+.btn-back:hover { color: var(--accent); }
+
+/* ── Converting state ─────────────────────────────────────────────────────── */
+#s-converting { text-align: center; padding: 52px 36px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.conv-spinner {
+  width: 52px; height: 52px; margin: 0 auto 24px;
+  border: 4px solid rgba(45,143,213,.15);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin .8s linear infinite;
+}
+.conv-type-badge {
+  display: inline-block;
+  background: rgba(45,143,213,.1); color: var(--accent);
+  border: 1px solid rgba(45,143,213,.3);
+  border-radius: 20px; padding: 3px 12px;
+  font-size: .68rem; font-weight: 700; letter-spacing: .4px;
+  margin-bottom: 14px;
+}
+.conv-title { font-size: 1rem; font-weight: 700; color: var(--text); margin-bottom: 6px; }
+.conv-file  { font-size: .78rem; color: var(--muted); margin-bottom: 8px; word-break: break-all; }
+.conv-msg   { font-size: .75rem; color: var(--accent); }
+
+/* ── Done state ───────────────────────────────────────────────────────────── */
+#s-done { text-align: center; padding: 48px 36px 40px; }
+.done-check {
+  width: 60px; height: 60px; margin: 0 auto 20px;
+  background: rgba(22,163,74,.1);
+  border: 2px solid rgba(22,163,74,.3);
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 26px; color: #16a34a;
+}
+.done-title { font-size: 1.1rem; font-weight: 800; color: var(--text); margin-bottom: 6px; }
+.done-sub   { font-size: .78rem; color: var(--muted); margin-bottom: 24px; }
+
+.btn-download {
+  display: inline-flex; align-items: center; gap: 9px;
+  background: linear-gradient(135deg, #16a34a, #15803d);
+  color: #fff; text-decoration: none;
+  border-radius: 10px; padding: 13px 28px;
+  font-size: .88rem; font-weight: 700;
+  box-shadow: 0 4px 16px rgba(22,163,74,.3);
+  transition: filter .15s, transform .1s;
+  margin-bottom: 20px;
+}
+.btn-download:hover  { filter: brightness(1.1); transform: translateY(-1px); }
+.btn-download:active { transform: translateY(0); }
+
+.done-cloud {
+  display: inline-flex; align-items: center; gap: 7px;
+  background: var(--light); border-radius: 8px;
+  padding: 9px 16px; font-size: .72rem; color: var(--muted);
+  margin-bottom: 22px;
+}
+.done-cloud strong { color: var(--text); font-weight: 600; }
+
+.btn-again {
+  background: none; border: 1px solid var(--border);
+  border-radius: 8px; padding: 9px 20px;
+  font-family: var(--font); font-size: .78rem;
+  color: var(--muted); cursor: pointer;
+  transition: border-color .15s, color .15s;
+}
+.btn-again:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ── Error state ──────────────────────────────────────────────────────────── */
+#s-error { text-align: center; padding: 48px 36px 40px; }
+.err-icon {
+  width: 56px; height: 56px; margin: 0 auto 18px;
+  background: rgba(220,38,38,.08);
+  border: 2px solid rgba(220,38,38,.25);
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px; color: var(--red);
+}
+.err-title   { font-size: 1rem; font-weight: 800; color: var(--text); margin-bottom: 8px; }
+.err-summary { font-size: .78rem; color: var(--red); margin-bottom: 16px; word-break: break-word; }
+.btn-err-toggle {
+  background: none; border: 1px solid rgba(220,38,38,.25);
+  border-radius: 6px; padding: 6px 14px;
+  font-family: var(--font); font-size: .72rem; color: #ef4444;
+  cursor: pointer; margin-bottom: 12px;
+  transition: background .15s;
+}
+.btn-err-toggle:hover { background: rgba(220,38,38,.06); }
+.err-details {
+  display: none; text-align: left;
+  background: #fef2f2; border: 1px solid rgba(220,38,38,.15);
+  border-radius: 8px; padding: 12px 14px;
+  font-family: Consolas, monospace; font-size: .68rem;
+  color: #7f1d1d; max-height: 180px; overflow-y: auto;
+  white-space: pre-wrap; word-break: break-all;
+  margin-bottom: 16px;
+}
+.err-details.open { display: block; }
+
+/* ── API warning ──────────────────────────────────────────────────────────── */
+.api-warn {
+  display: none;
+  width: 100%; max-width: 560px;
+  margin-top: 16px;
+  background: rgba(234,179,8,.08);
+  border: 1px solid rgba(234,179,8,.25);
+  border-radius: 10px; padding: 12px 18px;
+  font-size: .75rem; color: #ca8a04;
+  line-height: 1.6;
+}
+.api-warn.show { display: block; }
+.api-warn code {
+  background: rgba(234,179,8,.12); border-radius: 4px;
+  padding: 1px 7px; font-family: Consolas, monospace; font-size: .7rem;
+}
+
+/* ── Scrollbar ────────────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-thumb { background: rgba(45,143,213,.3); border-radius: 2px; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- Top bar -->
+  <div class="topbar">
+    <div class="brand">
+      <div class="brand-logo">DPW</div>
+      <span class="brand-name">DP World</span>
+    </div>
+    <span class="topbar-date" id="top-date"></span>
+  </div>
+
+  <!-- Hero -->
+  <div class="hero">
+    <h1>PDF to Excel Converter</h1>
+    <p>Daily Report Automation &nbsp;·&nbsp; DP World Vietnam</p>
+  </div>
+
+  <!-- Flow diagram -->
+  <div class="flow" id="flow">
+    <div class="flow-node">
+      <div class="flow-box">
+        <!-- PDF icon -->
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#e2e8f0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+          <line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
+          <polyline points="10 9 9 9 8 9"/>
+        </svg>
+        <span class="fbox-ext">PDF</span>
+      </div>
+      <span class="flow-label">SOURCE</span>
+    </div>
+
+    <div class="flow-conn">
+      <div class="flow-line"></div>
+      <div class="flow-pill" id="flow-pill">DPW</div>
+      <div class="flow-line" style="background:linear-gradient(90deg,rgba(45,143,213,.4),rgba(45,143,213,.15))"></div>
+    </div>
+
+    <div class="flow-node">
+      <div class="flow-box">
+        <!-- XLSX icon -->
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#e2e8f0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/>
+        </svg>
+        <span class="fbox-ext">XLSX</span>
+      </div>
+      <span class="flow-label">OUTPUT</span>
+    </div>
+  </div>
+
+  <!-- Main card -->
+  <div class="card">
+
+    <!-- State: upload -->
+    <div id="s-upload" class="state active">
+      <div class="drop-zone" id="drop-zone">
+        <input type="file" id="file-input" accept=".pdf">
+        <span class="drop-icon">☁️</span>
+        <div class="drop-title">Select your file here to get started</div>
+        <div class="drop-sub">or drop your PDF file here</div>
+        <button class="btn-select" onclick="document.getElementById('file-input').click(); event.stopPropagation()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          Select File
+        </button>
+      </div>
+    </div>
+
+    <!-- State: type select -->
+    <div id="s-type" class="state">
+      <div class="file-preview">
+        <span class="fp-icon">📄</span>
+        <span class="fp-name" id="fp-name">—</span>
+        <span class="fp-size" id="fp-size"></span>
+      </div>
+      <div class="type-prompt">What type of document is this?</div>
+      <div class="type-sub">Choose the correct type so we can extract the right data</div>
+      <div class="type-btns">
+        <button class="type-btn" onclick="startConvert('INV')">
+          <span class="tb-icon">🧾</span>
+          <span class="tb-code">INV</span>
+          <span class="tb-label">Commercial Invoice</span>
+        </button>
+        <button class="type-btn" onclick="startConvert('PKL')">
+          <span class="tb-icon">📦</span>
+          <span class="tb-code">PKL</span>
+          <span class="tb-label">Packing List</span>
+        </button>
+      </div>
+      <button class="btn-back" onclick="showState('s-upload')">← Choose a different file</button>
+    </div>
+
+    <!-- State: converting -->
+    <div id="s-converting" class="state">
+      <div class="conv-spinner"></div>
+      <div class="conv-type-badge" id="conv-badge">INV</div>
+      <div class="conv-title">Converting your document…</div>
+      <div class="conv-file" id="conv-file"></div>
+      <div class="conv-msg" id="conv-msg">Extracting data with AI…</div>
+    </div>
+
+    <!-- State: done -->
+    <div id="s-done" class="state">
+      <div class="done-check">✓</div>
+      <div class="done-title">Conversion Complete!</div>
+      <div class="done-sub" id="done-sub">5 rows extracted successfully</div>
+      <a class="btn-download" id="btn-dl" href="#">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Download Excel File
+      </a>
+      <div class="done-cloud">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>
+        Saved to <strong>OneDrive · DP World</strong>&nbsp; — restricted access
+      </div>
+      <button class="btn-again" onclick="reset()">Convert another file</button>
+    </div>
+
+    <!-- State: error -->
+    <div id="s-error" class="state">
+      <div class="err-icon">✕</div>
+      <div class="err-title">Conversion Failed</div>
+      <div class="err-summary" id="err-summary"></div>
+      <button class="btn-err-toggle" onclick="toggleDetails()">Show error details</button>
+      <div class="err-details" id="err-details"></div>
+      <button class="btn-again" onclick="reset()">Try again</button>
+    </div>
+
+  </div><!-- /card -->
+
+  <!-- API key warning -->
+  <div class="api-warn" id="api-warn">
+    ⚠ &nbsp;<strong>No AI key configured.</strong>
+    Get a free Gemini key at <strong>aistudio.google.com/apikey</strong>
+    → paste <code>GEMINI_API_KEY=AIzaSy...</code> into <code>.env</code> → restart server.
+  </div>
+
+</div><!-- /page -->
+
+<script>
+// ── State ─────────────────────────────────────────────────────────────────────
+let _file   = null;
+let _folder = null;
+
+document.getElementById("top-date").textContent = new Date().toLocaleDateString("en-GB", {
+  weekday:"long", year:"numeric", month:"long", day:"numeric"
+});
+
+// ── State transitions ─────────────────────────────────────────────────────────
+function showState(id) {
+  document.querySelectorAll(".state").forEach(el => el.classList.remove("active"));
+  document.getElementById(id).classList.add("active");
+  const flow = document.getElementById("flow");
+  flow.className = "flow";
+  if (id === "s-converting") flow.classList.add("converting");
+  if (id === "s-done")       flow.classList.add("done");
+}
+
+function reset() {
+  _file = _folder = null;
+  document.getElementById("file-input").value = "";
+  showState("s-upload");
+}
+
+// ── File selection ─────────────────────────────────────────────────────────────
+const fileInput = document.getElementById("file-input");
+fileInput.addEventListener("change", e => {
+  const f = e.target.files[0];
+  if (f) onFileChosen(f);
+});
+
+const dropZone = document.getElementById("drop-zone");
+dropZone.addEventListener("dragover", e => { e.preventDefault(); dropZone.classList.add("drag-over"); });
+dropZone.addEventListener("dragleave",  () => dropZone.classList.remove("drag-over"));
+dropZone.addEventListener("drop", e => {
+  e.preventDefault(); dropZone.classList.remove("drag-over");
+  const f = e.dataTransfer.files[0];
+  if (!f) return;
+  if (!f.name.toLowerCase().endsWith(".pdf")) { alert("Please select a PDF file."); return; }
+  onFileChosen(f);
+});
+
+function onFileChosen(f) {
+  _file = f;
+  document.getElementById("fp-name").textContent = f.name;
+  document.getElementById("fp-size").textContent = formatSize(f.size);
+  showState("s-type");
+}
+
+function formatSize(bytes) {
+  if (bytes < 1024)       return bytes + " B";
+  if (bytes < 1048576)    return (bytes/1024).toFixed(1)  + " KB";
+  return (bytes/1048576).toFixed(1) + " MB";
+}
+
+// ── Conversion (synchronous — waits for full result) ─────────────────────────
+async function startConvert(type) {
+  if (!_file) return;
+  _folder = type;
+
+  document.getElementById("conv-badge").textContent = type;
+  document.getElementById("conv-file").textContent  = _file.name;
+  document.getElementById("conv-msg").textContent   = "Uploading and extracting with AI…";
+  showState("s-converting");
+
+  const fd = new FormData();
+  fd.append("file", _file);
+  fd.append("type", type);
+
+  let r;
+  try {
+    r = await fetch("/api/convert", { method: "POST", body: fd });
+  } catch (netErr) {
+    showError("Cannot reach server — make sure app.py is running.", String(netErr));
+    return;
+  }
+
+  let d = {};
+  try { d = await r.json(); } catch (_) {}
+
+  if (!r.ok) {
+    showError(d.error || `Server error (HTTP ${r.status})`, d.detail || "");
+    return;
+  }
+
+  // Success — d contains { filename, folder, rows, xlsx_name, download_url }
+  document.getElementById("done-sub").textContent =
+    `${d.rows} rows extracted from ${d.filename}`;
+  document.getElementById("btn-dl").href = d.download_url;
+  showState("s-done");
+}
+
+function showError(summary, detail) {
+  document.getElementById("err-summary").textContent = summary || "An unexpected error occurred.";
+  document.getElementById("err-details").textContent = detail || "";
+  document.getElementById("err-details").classList.remove("open");
+  showState("s-error");
+}
+
+function toggleDetails() {
+  const el  = document.getElementById("err-details");
+  const btn = document.querySelector(".btn-err-toggle");
+  const open = el.classList.toggle("open");
+  btn.textContent = open ? "Hide error details" : "Show error details";
+}
+
+// ── API key check ─────────────────────────────────────────────────────────────
+(async () => {
+  try {
+    const r = await fetch("/api/config");
+    const d = await r.json();
+    if (!d.api_key_set) document.getElementById("api-warn").classList.add("show");
+  } catch(e) {}
+})();
+</script>
+</body>
+</html>

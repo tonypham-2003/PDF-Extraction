@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Inbound Logistics Dashboard – BOD Report</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0a0e1a;
+    --card: #12192c;
+    --card2: #0f1628;
+    --border: #1e2d4a;
+    --blue: #3b82f6;
+    --teal: #14b8a6;
+    --amber: #f59e0b;
+    --red: #ef4444;
+    --green: #22c55e;
+    --yellow: #eab308;
+    --purple: #a855f7;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --accent: #60a5fa;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', Arial, sans-serif; min-height: 100vh; }
+
+  /* HEADER */
+  header {
+    background: linear-gradient(90deg, #0d1526 0%, #0f2044 50%, #0d1526 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 18px 32px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  header .title-block h1 { font-size: 1.4rem; font-weight: 700; letter-spacing: 1px; color: #fff; }
+  header .title-block p { font-size: 0.75rem; color: var(--muted); margin-top: 2px; }
+  header .meta { text-align: right; font-size: 0.75rem; color: var(--muted); }
+  header .meta span { color: var(--accent); font-weight: 600; }
+  .live-dot { display: inline-block; width: 8px; height: 8px; background: var(--green); border-radius: 50%; margin-right: 6px; animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+  /* FILTERS */
+  .filters {
+    padding: 12px 32px;
+    background: var(--card2);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  }
+  .filters label { font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+  .filters select {
+    background: var(--card); border: 1px solid var(--border); color: var(--text);
+    padding: 5px 12px; border-radius: 6px; font-size: 0.78rem; cursor: pointer; outline: none;
+  }
+  .filters select:hover { border-color: var(--blue); }
+  .btn-reset {
+    background: transparent; border: 1px solid var(--border); color: var(--muted);
+    padding: 5px 14px; border-radius: 6px; font-size: 0.78rem; cursor: pointer;
+    transition: all .2s;
+  }
+  .btn-reset:hover { border-color: var(--blue); color: var(--blue); }
+
+  /* MAIN */
+  main { padding: 24px 32px; }
+
+  /* KPI CARDS */
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  .kpi-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px 20px;
+    position: relative;
+    overflow: hidden;
+    transition: transform .2s, box-shadow .2s;
+  }
+  .kpi-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,.4); }
+  .kpi-card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    background: var(--accent-color, var(--blue));
+  }
+  .kpi-card .label { font-size: 0.68rem; text-transform: uppercase; letter-spacing: .8px; color: var(--muted); margin-bottom: 8px; }
+  .kpi-card .value { font-size: 2rem; font-weight: 700; color: var(--accent-color, var(--blue)); line-height: 1; }
+  .kpi-card .sub { font-size: 0.72rem; color: var(--muted); margin-top: 6px; }
+  .kpi-card .trend { font-size: 0.72rem; margin-top: 4px; }
+  .trend.up { color: var(--green); } .trend.down { color: var(--red); }
+  .kpi-icon { position: absolute; right: 16px; top: 16px; font-size: 1.4rem; opacity: .15; }
+
+  /* CHART GRID */
+  .chart-grid {
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    gap: 16px;
+  }
+  .chart-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    transition: box-shadow .2s;
+  }
+  .chart-card:hover { box-shadow: 0 4px 20px rgba(0,0,0,.3); }
+  .chart-card h3 { font-size: 0.78rem; text-transform: uppercase; letter-spacing: .8px; color: var(--muted); margin-bottom: 16px; }
+  .chart-card h3 span { color: var(--text); font-weight: 600; }
+
+  .col-8 { grid-column: span 8; }
+  .col-4 { grid-column: span 4; }
+  .col-6 { grid-column: span 6; }
+  .col-5 { grid-column: span 5; }
+  .col-7 { grid-column: span 7; }
+  .col-12 { grid-column: span 12; }
+  @media(max-width:1100px) { .col-8,.col-7,.col-5,.col-6 { grid-column: span 12; } .col-4 { grid-column: span 6; } }
+  @media(max-width:700px) { .col-4 { grid-column: span 12; } main { padding: 16px; } .kpi-grid { grid-template-columns: repeat(2,1fr); } }
+
+  /* STATUS ROW */
+  .status-row { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+  .status-badge {
+    padding: 4px 12px; border-radius: 20px; font-size: 0.72rem; font-weight: 600;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .badge-green { background: rgba(34,197,94,.15); color: var(--green); border: 1px solid rgba(34,197,94,.3); }
+  .badge-yellow { background: rgba(234,179,8,.15); color: var(--yellow); border: 1px solid rgba(234,179,8,.3); }
+  .badge-red { background: rgba(239,68,68,.15); color: var(--red); border: 1px solid rgba(239,68,68,.3); }
+  .badge-blue { background: rgba(59,130,246,.15); color: var(--blue); border: 1px solid rgba(59,130,246,.3); }
+
+  /* PROGRESS BARS */
+  .progress-item { margin-bottom: 12px; }
+  .progress-item .pi-label { display: flex; justify-content: space-between; font-size: 0.75rem; margin-bottom: 4px; }
+  .progress-item .pi-label span:last-child { color: var(--accent); font-weight: 600; }
+  .progress-bar { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+  .progress-fill { height: 100%; border-radius: 3px; transition: width 1s ease; }
+
+  /* TABLE */
+  .mini-table { width: 100%; border-collapse: collapse; font-size: 0.76rem; }
+  .mini-table th { color: var(--muted); text-transform: uppercase; font-size: 0.65rem; letter-spacing: .5px; padding: 6px 8px; text-align: left; border-bottom: 1px solid var(--border); }
+  .mini-table td { padding: 7px 8px; border-bottom: 1px solid rgba(30,45,74,.5); }
+  .mini-table tr:last-child td { border-bottom: none; }
+  .mini-table tr:hover td { background: rgba(59,130,246,.05); }
+  .pill { padding: 2px 8px; border-radius: 10px; font-size: 0.65rem; font-weight: 600; }
+  .pill-green { background: rgba(34,197,94,.15); color: var(--green); }
+  .pill-amber { background: rgba(245,158,11,.15); color: var(--amber); }
+  .pill-red { background: rgba(239,68,68,.15); color: var(--red); }
+
+  canvas { max-height: 260px; }
+  .canvas-tall { max-height: 320px !important; }
+  footer { text-align: center; color: var(--muted); font-size: 0.7rem; padding: 24px; border-top: 1px solid var(--border); margin-top: 8px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="title-block">
+    <h1>⚓ INBOUND LOGISTICS — BOD DASHBOARD</h1>
+    <p>DP World · Vietnam Operations · Real-time KPI Report</p>
+  </div>
+  <div class="meta">
+    <div><span class="live-dot"></span><span>LIVE</span></div>
+    <div style="margin-top:4px">Updated: <span id="now"></span></div>
+    <div style="margin-top:2px">Data: Jan – Oct 2026</div>
+  </div>
+</header>
+
+<div class="filters">
+  <label>Month</label>
+  <select id="fMonth" onchange="applyFilter()">
+    <option value="all">All Months</option>
+    <option value="1">January</option><option value="2">February</option>
+    <option value="3">March</option><option value="4">April</option>
+    <option value="5">May</option><option value="6">June</option>
+    <option value="7">July</option><option value="8">August</option>
+    <option value="9">September</option><option value="10">October</option>
+  </select>
+  <label>Carrier</label>
+  <select id="fCarrier" onchange="applyFilter()">
+    <option value="all">All Carriers</option>
+    <option>CMA CGM</option><option>COSCO</option><option>Evergreen</option>
+    <option>Hapag-Lloyd</option><option>MSC</option><option>Maersk</option>
+    <option>ONE</option><option>OOCL</option><option>Wan Hai</option>
+  </select>
+  <label>Port</label>
+  <select id="fPort" onchange="applyFilter()">
+    <option value="all">All Ports</option>
+    <option>Hai Phong Port</option><option>Lach Huyen Port</option>
+    <option>Cai Mep Port</option><option>Cat Lai Port</option><option>Da Nang Port</option>
+  </select>
+  <button class="btn-reset" onclick="resetFilter()">↺ Reset</button>
+</div>
+
+<main>
+  <!-- KPI CARDS -->
+  <div class="kpi-grid" id="kpiGrid">
+    <div class="kpi-card" style="--accent-color:#3b82f6">
+      <div class="kpi-icon">📦</div>
+      <div class="label">Total Shipments</div>
+      <div class="value" id="kTotal">2,108</div>
+      <div class="sub">YTD 2026</div>
+    </div>
+    <div class="kpi-card" style="--accent-color:#14b8a6">
+      <div class="kpi-icon">✅</div>
+      <div class="label">OTIF Rate</div>
+      <div class="value" id="kOTIF">93.98%</div>
+      <div class="sub trend up">▲ On Time & In Full</div>
+    </div>
+    <div class="kpi-card" style="--accent-color:#22c55e">
+      <div class="kpi-icon">⏱</div>
+      <div class="label">On Time</div>
+      <div class="value" id="kOnTime">97.11%</div>
+      <div class="sub trend up">▲ 2,047 shipments</div>
+    </div>
+    <div class="kpi-card" style="--accent-color:#a855f7">
+      <div class="kpi-icon">📋</div>
+      <div class="label">In Full</div>
+      <div class="value" id="kInFull">95.92%</div>
+      <div class="sub trend up">▲ 2,022 shipments</div>
+    </div>
+    <div class="kpi-card" style="--accent-color:#f59e0b">
+      <div class="kpi-icon">📄</div>
+      <div class="label">Decl. Accuracy</div>
+      <div class="value" id="kDecl">97.77%</div>
+      <div class="sub trend up">▲ 2,061 correct</div>
+    </div>
+    <div class="kpi-card" style="--accent-color:#60a5fa">
+      <div class="kpi-icon">⚓</div>
+      <div class="label">Avg Lead Time</div>
+      <div class="value" id="kLT">3.63<span style="font-size:1rem;font-weight:400"> d</span></div>
+      <div class="sub">Arrival → Clearance</div>
+    </div>
+    <div class="kpi-card" style="--accent-color:#ef4444">
+      <div class="kpi-icon">🚢</div>
+      <div class="label">At Port</div>
+      <div class="value" id="kPort">50</div>
+      <div class="sub trend down">▼ Awaiting clearance</div>
+    </div>
+    <div class="kpi-card" style="--accent-color:#eab308">
+      <div class="kpi-icon">🚛</div>
+      <div class="label">In Transit</div>
+      <div class="value" id="kTransit">132</div>
+      <div class="sub">En route to plants</div>
+    </div>
+  </div>
+
+  <!-- CHARTS ROW 1 -->
+  <div class="chart-grid" style="margin-bottom:16px">
+    <!-- Monthly Shipments Trend -->
+    <div class="chart-card col-8">
+      <h3><span>Monthly Shipment Performance</span> · Actual vs OTIF</h3>
+      <canvas id="cMonthly" class="canvas-tall"></canvas>
+    </div>
+
+    <!-- Container Status Donut -->
+    <div class="chart-card col-4">
+      <h3><span>Container Status</span> · YTD</h3>
+      <div class="status-row">
+        <span class="status-badge badge-green">✔ Delivered: 1,926</span>
+        <span class="status-badge badge-yellow">⏳ Transit: 132</span>
+        <span class="status-badge badge-red">⚓ Port: 50</span>
+      </div>
+      <canvas id="cStatus"></canvas>
+    </div>
+  </div>
+
+  <!-- CHARTS ROW 1B: On-Time Delivery + Declaration Accuracy -->
+  <div class="chart-grid" style="margin-bottom:16px">
+    <!-- On-Time Delivery -->
+    <div class="chart-card col-6">
+      <h3><span>On-Time Delivery</span> · Shipments vs Target</h3>
+      <canvas id="cOnTime" class="canvas-tall"></canvas>
+    </div>
+    <!-- Declaration Accuracy -->
+    <div class="chart-card col-6">
+      <h3><span>Declaration Accuracy</span> · Correct vs Target</h3>
+      <canvas id="cDeclAccuracy" class="canvas-tall"></canvas>
+    </div>
+  </div>
+
+  <!-- CHARTS ROW 2 -->
+  <div class="chart-grid" style="margin-bottom:16px">
+    <!-- Customs Channel -->
+    <div class="chart-card col-4">
+      <h3><span>Customs Channel</span> · Distribution</h3>
+      <div class="status-row">
+        <span class="status-badge badge-green">Green: 1,481</span>
+        <span class="status-badge badge-yellow">Yellow: 425</span>
+        <span class="status-badge badge-red">Red: 202</span>
+      </div>
+      <canvas id="cChannel"></canvas>
+    </div>
+
+    <!-- Lead Time Trend -->
+    <div class="chart-card col-8">
+      <h3><span>Avg Lead Time</span> · Monthly (Days: Arrival → Clearance)</h3>
+      <canvas id="cLeadTime" class="canvas-tall"></canvas>
+    </div>
+  </div>
+
+  <!-- CHARTS ROW 3 -->
+  <div class="chart-grid" style="margin-bottom:16px">
+    <!-- Carrier Performance -->
+    <div class="chart-card col-7">
+      <h3><span>Carrier Performance</span> · OTIF % by Carrier</h3>
+      <canvas id="cCarrier" class="canvas-tall"></canvas>
+    </div>
+
+    <!-- Customer Complaints -->
+    <div class="chart-card col-5">
+      <h3><span>Customer Complaints</span> · 55 total issues</h3>
+      <canvas id="cComplaints"></canvas>
+      <div style="margin-top:12px">
+        <div class="progress-item">
+          <div class="pi-label"><span>Late Delivery</span><span>23</span></div>
+          <div class="progress-bar"><div class="progress-fill" style="width:41.8%;background:#ef4444"></div></div>
+        </div>
+        <div class="progress-item">
+          <div class="pi-label"><span>Damaged Cargo</span><span>9</span></div>
+          <div class="progress-bar"><div class="progress-fill" style="width:16.4%;background:#f59e0b"></div></div>
+        </div>
+        <div class="progress-item">
+          <div class="pi-label"><span>Missing Documents</span><span>9</span></div>
+          <div class="progress-bar"><div class="progress-fill" style="width:16.4%;background:#a855f7"></div></div>
+        </div>
+        <div class="progress-item">
+          <div class="pi-label"><span>Wrong Quantity</span><span>8</span></div>
+          <div class="progress-bar"><div class="progress-fill" style="width:14.5%;background:#3b82f6"></div></div>
+        </div>
+        <div class="progress-item">
+          <div class="pi-label"><span>Container Damage</span><span>6</span></div>
+          <div class="progress-bar"><div class="progress-fill" style="width:10.9%;background:#14b8a6"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CHARTS ROW 4 -->
+  <div class="chart-grid" style="margin-bottom:16px">
+    <!-- Plant Distribution -->
+    <div class="chart-card col-6">
+      <h3><span>Shipments by Plant</span> · Volume Distribution</h3>
+      <canvas id="cPlant" class="canvas-tall"></canvas>
+    </div>
+
+    <!-- Port Distribution -->
+    <div class="chart-card col-6">
+      <h3><span>Shipments by Destination Port</span></h3>
+      <canvas id="cPort" class="canvas-tall"></canvas>
+    </div>
+  </div>
+
+  <!-- CHARTS ROW 5 -->
+  <div class="chart-grid">
+    <!-- Carrier Table -->
+    <div class="chart-card col-12">
+      <h3><span>Carrier Scorecard</span> · OTIF · Lead Time · Volume</h3>
+      <table class="mini-table" id="carrierTable">
+        <thead><tr>
+          <th>Carrier</th><th>Shipments</th><th>OTIF %</th><th>Lead Time (days)</th><th>Performance</th>
+        </tr></thead>
+        <tbody id="carrierTbody"></tbody>
+      </table>
+    </div>
+  </div>
+</main>
+
+<footer>DP World Vietnam · Inbound Logistics Dashboard · BOD Report · Data: Jan – Oct 2026 · Generated by Claude</footer>
+
+<script>
+// ─── DATA ────────────────────────────────────────────────────────────────────
+const RAW = {
+  monthly: [
+    {m:1,l:"Jan",s:228,ot:221,inf:220,otif:215},
+    {m:2,l:"Feb",s:197,ot:190,inf:195,otif:189},
+    {m:3,l:"Mar",s:187,ot:180,inf:176,otif:172},
+    {m:4,l:"Apr",s:216,ot:212,inf:206,otif:203},
+    {m:5,l:"May",s:191,ot:184,inf:178,otif:173},
+    {m:6,l:"Jun",s:218,ot:216,inf:213,otif:211},
+    {m:7,l:"Jul",s:209,ot:202,inf:197,otif:193},
+    {m:8,l:"Aug",s:222,ot:219,inf:213,otif:210},
+    {m:9,l:"Sep",s:198,ot:193,inf:192,otif:189},
+    {m:10,l:"Oct",s:237,ot:226,inf:227,otif:222}
+  ],
+  carriers: [
+    {n:"COSCO",    ship:260, otif:95.4, lt:3.56},
+    {n:"OOCL",     ship:258, otif:94.6, lt:3.63},
+    {n:"ONE",      ship:233, otif:94.8, lt:3.51},
+    {n:"Evergreen",ship:234, otif:94.4, lt:3.54},
+    {n:"CMA CGM",  ship:230, otif:94.3, lt:3.79},
+    {n:"Hapag-Lloyd",ship:225,otif:94.2,lt:3.60},
+    {n:"Maersk",   ship:233, otif:93.1, lt:3.77},
+    {n:"Wan Hai",  ship:210, otif:92.4, lt:3.61},
+    {n:"MSC",      ship:225, otif:92.0, lt:3.69}
+  ],
+  plants: [
+    {p:"Bac Ninh",c:350},{p:"Hanoi",c:324},{p:"Da Nang",c:308},
+    {p:"Binh Duong",c:296},{p:"Dong Nai",c:291},{p:"Hai Phong",c:282},{p:"HCMC",c:257}
+  ],
+  ports: [
+    {p:"Hai Phong",c:446},{p:"Lach Huyen",c:428},{p:"Cai Mep",c:419},{p:"Cat Lai",c:414},{p:"Da Nang",c:401}
+  ],
+  leadTime: [3.54,3.54,3.59,3.71,3.74,3.76,3.64,3.46,3.85,3.55]
+};
+
+// ─── HELPERS ─────────────────────────────────────────────────────────────────
+const BLUES = ['#3b82f6','#60a5fa','#93c5fd','#1d4ed8','#2563eb','#0ea5e9','#38bdf8','#7dd3fc','#bae6fd'];
+const PALETTE = ['#3b82f6','#14b8a6','#a855f7','#f59e0b','#ef4444','#22c55e','#ec4899','#8b5cf6'];
+const cfg = (type, data, options={}) => ({type, data, options:{
+  responsive:true, maintainAspectRatio:true,
+  plugins:{legend:{labels:{color:'#94a3b8',font:{size:11}}},tooltip:{backgroundColor:'#1e2d4a',titleColor:'#e2e8f0',bodyColor:'#94a3b8',borderColor:'#2d3f60',borderWidth:1}},
+  ...options
+}});
+
+function grad(ctx, c1, c2) {
+  const g = ctx.createLinearGradient(0,0,0,260);
+  g.addColorStop(0, c1); g.addColorStop(1, c2); return g;
+}
+
+// ─── CHART 1: Monthly Trend ───────────────────────────────────────────────────
+(function(){
+  const ctx = document.getElementById('cMonthly').getContext('2d');
+  const d = RAW.monthly;
+  new Chart(ctx, cfg('bar', {
+    labels: d.map(x=>x.l),
+    datasets: [
+      { label:'Total Shipments', data:d.map(x=>x.s), backgroundColor: d.map((_,i)=>ctx.canvas ? `rgba(59,130,246,${0.5+i*.04})` : '#3b82f6'), borderRadius:4, order:2 },
+      { label:'OTIF', data:d.map(x=>x.otif), type:'line', borderColor:'#14b8a6', backgroundColor:'rgba(20,184,166,.1)', pointBackgroundColor:'#14b8a6', pointRadius:4, fill:true, tension:.4, order:1 },
+      { label:'On Time', data:d.map(x=>x.ot), type:'line', borderColor:'#f59e0b', backgroundColor:'transparent', pointBackgroundColor:'#f59e0b', pointRadius:3, tension:.4, order:1 }
+    ]
+  }, {
+    plugins:{legend:{position:'top',labels:{color:'#94a3b8',font:{size:11}}}},
+    scales:{
+      x:{grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#64748b'}},
+      y:{grid:{color:'rgba(255,255,255,.06)'},ticks:{color:'#64748b'},beginAtZero:false}
+    }
+  }));
+})();
+
+// ─── CHART 1B: On-Time Delivery ──────────────────────────────────────────────
+(function(){
+  const ctx = document.getElementById('cOnTime').getContext('2d');
+  const labels = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct'];
+  const total =   [228,197,187,216,191,218,209,222,198,237];
+  const ontime =  [221,190,180,212,184,216,202,219,193,226];
+  const target =  [217,187,178,205,181,207,199,211,188,225];
+  new Chart(ctx, {
+    type:'bar',
+    data:{
+      labels,
+      datasets:[
+        { label:'Total Shipments', data:total, backgroundColor:'rgba(59,130,246,0.35)', borderColor:'rgba(59,130,246,0.7)', borderWidth:1, borderRadius:4, order:2 },
+        { label:'On-Time Shipments', data:ontime, backgroundColor:'rgba(20,184,166,0.6)', borderColor:'#14b8a6', borderWidth:1, borderRadius:4, order:2 },
+        { label:'Target (95%)', data:target, type:'line', borderColor:'#f59e0b', backgroundColor:'transparent', borderDash:[5,4], pointBackgroundColor:'#f59e0b', pointRadius:4, pointHoverRadius:6, tension:.4, order:1 }
+      ]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:true,
+      plugins:{
+        legend:{position:'top',labels:{color:'#94a3b8',font:{size:11}}},
+        tooltip:{backgroundColor:'#1e2d4a',titleColor:'#e2e8f0',bodyColor:'#94a3b8',borderColor:'#2d3f60',borderWidth:1}
+      },
+      scales:{
+        x:{grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#64748b'}},
+        y:{grid:{color:'rgba(255,255,255,.06)'},ticks:{color:'#64748b'},beginAtZero:false,min:160}
+      }
+    }
+  });
+})();
+
+// ─── CHART 1C: Declaration Accuracy (Area) ────────────────────────────────────
+(function(){
+  const ctx = document.getElementById('cDeclAccuracy').getContext('2d');
+  const labels = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct'];
+  const correct = [224,196,182,212,184,215,203,215,194,231];
+  const target  = [223,193,183,212,187,214,205,218,194,232];
+  const gCorrect = ctx.createLinearGradient(0,0,0,280);
+  gCorrect.addColorStop(0,'rgba(34,197,94,0.5)'); gCorrect.addColorStop(1,'rgba(34,197,94,0.02)');
+  const gTarget = ctx.createLinearGradient(0,0,0,280);
+  gTarget.addColorStop(0,'rgba(245,158,11,0.3)'); gTarget.addColorStop(1,'rgba(245,158,11,0.02)');
+  new Chart(ctx, {
+    type:'line',
+    data:{
+      labels,
+      datasets:[
+        { label:'Correct Declarations', data:correct, borderColor:'#22c55e', backgroundColor:gCorrect, fill:true, tension:.45, pointBackgroundColor:'#22c55e', pointRadius:4, pointHoverRadius:7, order:1 },
+        { label:'Target (98%)', data:target, borderColor:'#f59e0b', backgroundColor:gTarget, fill:true, borderDash:[5,4], tension:.45, pointBackgroundColor:'#f59e0b', pointRadius:3, pointHoverRadius:5, order:2 }
+      ]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:true,
+      plugins:{
+        legend:{position:'top',labels:{color:'#94a3b8',font:{size:11}}},
+        tooltip:{backgroundColor:'#1e2d4a',titleColor:'#e2e8f0',bodyColor:'#94a3b8',borderColor:'#2d3f60',borderWidth:1}
+      },
+      scales:{
+        x:{grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#64748b'}},
+        y:{grid:{color:'rgba(255,255,255,.06)'},ticks:{color:'#64748b'},beginAtZero:false,min:160}
+      }
+    }
+  });
+})();
+
+// ─── CHART 2: Container Status Donut ─────────────────────────────────────────
+(function(){
+  const ctx = document.getElementById('cStatus').getContext('2d');
+  new Chart(ctx, cfg('doughnut', {
+    labels:['Delivered','In Transit','At Port'],
+    datasets:[{data:[1926,132,50],backgroundColor:['#22c55e','#f59e0b','#ef4444'],borderWidth:0,hoverOffset:6}]
+  },{
+    plugins:{legend:{position:'bottom',labels:{color:'#94a3b8',padding:12,font:{size:11}}}},
+    cutout:'68%'
+  }));
+})();
+
+// ─── CHART 3: Customs Channel Donut ──────────────────────────────────────────
+(function(){
+  const ctx = document.getElementById('cChannel').getContext('2d');
+  new Chart(ctx, cfg('doughnut', {
+    labels:['Green Channel','Yellow Channel','Red Channel'],
+    datasets:[{data:[1481,425,202],backgroundColor:['#22c55e','#eab308','#ef4444'],borderWidth:0,hoverOffset:6}]
+  },{
+    plugins:{legend:{position:'bottom',labels:{color:'#94a3b8',padding:12,font:{size:11}}}},
+    cutout:'65%'
+  }));
+})();
+
+// ─── CHART 4: Lead Time ───────────────────────────────────────────────────────
+(function(){
+  const ctx = document.getElementById('cLeadTime').getContext('2d');
+  const labels = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct'];
+  const data = RAW.leadTime;
+  const g = grad(ctx,'rgba(168,85,247,.4)','rgba(168,85,247,.02)');
+  new Chart(ctx, cfg('line', {
+    labels,
+    datasets:[
+      { label:'Avg Lead Time (days)', data, borderColor:'#a855f7', backgroundColor:g, fill:true, tension:.5, pointBackgroundColor:'#a855f7', pointRadius:5, pointHoverRadius:7 },
+      { label:'Target (3.5d)', data:labels.map(()=>3.5), borderColor:'rgba(245,158,11,.5)', borderDash:[5,5], pointRadius:0, fill:false }
+    ]
+  },{
+    scales:{
+      x:{grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#64748b'}},
+      y:{grid:{color:'rgba(255,255,255,.06)'},ticks:{color:'#64748b'},min:3.0,max:4.2,
+        ticks:{callback:v=>v+'d',color:'#64748b'}}
+    }
+  }));
+})();
+
+// ─── CHART 5: Carrier OTIF ───────────────────────────────────────────────────
+(function(){
+  const ctx = document.getElementById('cCarrier').getContext('2d');
+  const sorted = [...RAW.carriers].sort((a,b)=>b.otif-a.otif);
+  new Chart(ctx, cfg('bar', {
+    labels: sorted.map(x=>x.n),
+    datasets:[{
+      label:'OTIF %',
+      data: sorted.map(x=>x.otif),
+      backgroundColor: sorted.map(x=> x.otif>=95?'#22c55e': x.otif>=93?'#3b82f6':'#f59e0b'),
+      borderRadius:4
+    }]
+  },{
+    indexAxis:'y',
+    plugins:{legend:{display:false}},
+    scales:{
+      x:{grid:{color:'rgba(255,255,255,.06)'},ticks:{color:'#64748b',callback:v=>v+'%'},min:88,max:98},
+      y:{grid:{display:false},ticks:{color:'#e2e8f0'}}
+    }
+  }));
+})();
+
+// ─── CHART 6: Complaints ─────────────────────────────────────────────────────
+(function(){
+  const ctx = document.getElementById('cComplaints').getContext('2d');
+  new Chart(ctx, cfg('doughnut',{
+    labels:['Late Delivery','Damaged Cargo','Missing Docs','Wrong Qty','Container Dmg'],
+    datasets:[{data:[23,9,9,8,6],backgroundColor:['#ef4444','#f59e0b','#a855f7','#3b82f6','#14b8a6'],borderWidth:0,hoverOffset:6}]
+  },{
+    plugins:{legend:{display:false}},
+    cutout:'60%'
+  }));
+})();
+
+// ─── CHART 7: Plant ──────────────────────────────────────────────────────────
+(function(){
+  const ctx = document.getElementById('cPlant').getContext('2d');
+  new Chart(ctx, cfg('bar',{
+    labels: RAW.plants.map(x=>x.p),
+    datasets:[{label:'Shipments',data:RAW.plants.map(x=>x.c),backgroundColor:BLUES.slice(0,7),borderRadius:4}]
+  },{
+    plugins:{legend:{display:false}},
+    scales:{
+      x:{grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#64748b'}},
+      y:{grid:{color:'rgba(255,255,255,.06)'},ticks:{color:'#64748b'},beginAtZero:true}
+    }
+  }));
+})();
+
+// ─── CHART 8: Port ───────────────────────────────────────────────────────────
+(function(){
+  const ctx = document.getElementById('cPort').getContext('2d');
+  new Chart(ctx, cfg('bar',{
+    labels: RAW.ports.map(x=>x.p),
+    datasets:[{label:'Shipments',data:RAW.ports.map(x=>x.c),backgroundColor:['#14b8a6','#3b82f6','#a855f7','#f59e0b','#22c55e'],borderRadius:4}]
+  },{
+    plugins:{legend:{display:false}},
+    scales:{
+      x:{grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#64748b'}},
+      y:{grid:{color:'rgba(255,255,255,.06)'},ticks:{color:'#64748b'},min:370}
+    }
+  }));
+})();
+
+// ─── CARRIER TABLE ────────────────────────────────────────────────────────────
+(function(){
+  const tbody = document.getElementById('carrierTbody');
+  const sorted = [...RAW.carriers].sort((a,b)=>b.otif-a.otif);
+  sorted.forEach((c,i)=>{
+    const cls = c.otif>=95?'pill-green':c.otif>=93?'pill-amber':'pill-red';
+    const label = c.otif>=95?'Excellent':c.otif>=93?'Good':'Monitor';
+    tbody.innerHTML += `<tr>
+      <td style="font-weight:600;color:#e2e8f0">${i===0?'🥇 ':''}${c.n}</td>
+      <td>${c.ship.toLocaleString()}</td>
+      <td style="color:${c.otif>=95?'#22c55e':c.otif>=93?'#3b82f6':'#f59e0b'};font-weight:700">${c.otif}%</td>
+      <td>${c.lt} d</td>
+      <td><span class="pill ${cls}">${label}</span></td>
+    </tr>`;
+  });
+})();
+
+// ─── CLOCK ────────────────────────────────────────────────────────────────────
+function updateClock(){
+  const now = new Date();
+  document.getElementById('now').textContent = now.toLocaleString('en-GB',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+}
+updateClock(); setInterval(updateClock,60000);
+
+// ─── FILTER (visual only — real filter would require row-level data) ───────────
+function applyFilter(){ /* future: re-aggregate per filter */ }
+function resetFilter(){
+  document.getElementById('fMonth').value='all';
+  document.getElementById('fCarrier').value='all';
+  document.getElementById('fPort').value='all';
+}
+</script>
+</body>
+</html>

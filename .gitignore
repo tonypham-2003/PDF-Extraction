@@ -1,0 +1,22 @@
+# Secrets — never commit
+.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Temp processing files
+Input/INV/
+Input/PKL/
+Output/INV/
+Output/PKL/
+tmp/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+app.log
