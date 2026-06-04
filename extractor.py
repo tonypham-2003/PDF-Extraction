@@ -14,9 +14,11 @@ import fitz          # PyMuPDF
 
 def _active_backend() -> str:
     """Return 'claude', 'groq', 'gemini', or raise if nothing is configured."""
-    key_ant = os.environ.get("ANTHROPIC_API_KEY", "").strip()
-    key_grq = os.environ.get("GROQ_API_KEY",      "").strip()
-    key_gem = os.environ.get("GEMINI_API_KEY",     "").strip()
+    # Strip BOM + whitespace that some systems add to env var values
+    _clean = lambda k: os.environ.get(k, "").strip().lstrip("﻿​")
+    key_ant = _clean("ANTHROPIC_API_KEY")
+    key_grq = _clean("GROQ_API_KEY")
+    key_gem = _clean("GEMINI_API_KEY")
 
     if key_ant.startswith("sk-ant-") and len(key_ant) > 80:
         return "claude"
