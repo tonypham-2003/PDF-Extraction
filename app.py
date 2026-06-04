@@ -43,20 +43,6 @@ def index():
     return render_template("index.html")
 
 
-@app.route("/api/debug-env")
-def debug_env():
-    """Temporary: confirm env vars reach Vercel runtime."""
-    import os
-    groq  = os.environ.get("GROQ_API_KEY", "")
-    supa  = os.environ.get("SUPABASE_URL", "")
-    return jsonify({
-        "GROQ_API_KEY":    (groq[:8] + "..." if groq else "NOT SET"),
-        "GROQ_len":        len(groq),
-        "SUPABASE_URL":    (supa[:30] + "..." if supa else "NOT SET"),
-        "active_backend":  extractor.active_backend(),
-    })
-
-
 @app.route("/api/config")
 def api_config():
     return jsonify({
