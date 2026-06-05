@@ -12,13 +12,16 @@ import fitz          # PyMuPDF
 
 # ── AI client helpers ─────────────────────────────────────────────────────────
 
+def _env(key: str) -> str:
+    """Get env var, stripping BOM + whitespace that PowerShell/Windows can add."""
+    return os.environ.get(key, "").strip().lstrip("﻿​")
+
+
 def _active_backend() -> str:
     """Return 'claude', 'groq', 'gemini', or raise if nothing is configured."""
-    # Strip BOM + whitespace that some systems add to env var values
-    _clean = lambda k: os.environ.get(k, "").strip().lstrip("﻿​")
-    key_ant = _clean("ANTHROPIC_API_KEY")
-    key_grq = _clean("GROQ_API_KEY")
-    key_gem = _clean("GEMINI_API_KEY")
+    key_ant = _env("ANTHROPIC_API_KEY")
+    key_grq = _env("GROQ_API_KEY")
+    key_gem = _env("GEMINI_API_KEY")
 
     if key_ant.startswith("sk-ant-") and len(key_ant) > 80:
         return "claude"
@@ -38,7 +41,7 @@ def _claude():
     global _claude_client
     if _claude_client is None:
         import anthropic
-        _claude_client = anthropic.Anthropic()
+        _claude_client = anthropic.Anthropic(api_key=_env("ANTHROPIC_API_KEY"))
     return _claude_client
 
 
@@ -47,7 +50,7 @@ def _gemini():
     global _gemini_client
     if _gemini_client is None:
         from google import genai
-        _gemini_client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
+        _gemini_client = genai.Client(api_key=_env("GEMINI_API_KEY"))
     return _gemini_client
 
 
@@ -106,7 +109,7 @@ def _groq():
     global _groq_client
     if _groq_client is None:
         from groq import Groq
-        _groq_client = Groq(api_key=os.environ["GROQ_API_KEY"])
+        _groq_client = Groq(api_key=_env("GROQ_API_KEY"))
     return _groq_client
 
 
