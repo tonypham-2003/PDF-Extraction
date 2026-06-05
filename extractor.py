@@ -154,11 +154,16 @@ def _call_gemini(images_b64: list[str], prompt: str) -> list[dict]:
 
 _UNCERTAINTY_RULE = """
 UNCERTAINTY RULE (apply to every field):
-- If a value is clearly readable → return it as-is.
-- If a value is partially visible, ambiguous, or you are not confident → prefix with "?" (e.g. "?2349.00", "?PCS", "?SINGAPORE").
+- Fill in your best guess for every field — do not leave uncertain fields blank.
+- If you are not fully confident about a value (partially visible, ambiguous, or inferred),
+  add that field's key name to an extra "uncertain" array in the same object.
 - If a field is truly absent from the document → return "".
-- Do NOT guess or fabricate values. An uncertain "?" is always better than a wrong answer.
-Numbers: return as plain number string without currency symbol (e.g. "2349.00", not "USD 2,349.00").
+- Numbers: return as plain number string without currency symbol (e.g. "2349.00", not "USD 2,349.00").
+
+Example with uncertainty:
+{"ma_hang":"AB-123","ten_hang":"Compressor Unit","so_luong_1":"5","don_vi_tinh_1":"PCS",
+ "don_gia":"2349.00","tong_tri_gia":"11745.00","ma_hs":"","xuat_xu":"TH",
+ "so_luong_2":"","don_vi_tinh_2":"","uncertain":["xuat_xu","don_gia"]}
 """
 
 _PROMPTS = {

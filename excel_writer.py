@@ -10,7 +10,7 @@ Template structure (matches template.xls exactly):
 Number format : US input "2,349.00" → Vietnamese output "2.349,00" (all numeric strings)
 Đơn giá       → stored as string in Vietnamese format ("2.349,00")
 Tổng trị giá  → stored as float with #,##0.00 format (renders per Windows locale)
-Uncertain     → cells prefixed with "?" by AI are highlighted yellow for manual review
+Uncertain     → AI returns "uncertain":[field,...] per row; those cells are highlighted yellow for manual review
 """
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
@@ -37,23 +37,15 @@ def _thin():
 def _us_to_vn(s: str) -> str:
     """Convert number string from US format (2,349.00) to Vietnamese (2.349,00).
     Handles plain numbers too: "2349" → "2.349,00", "25.5" → "25,50".
-    If value starts with "?" (uncertain), converts the numeric part and keeps "?".
     """
     if not s:
         return s
     s = str(s).strip()
-    prefix = ""
-    val_str = s
-    if s.startswith("?"):
-        prefix = "?"
-        val_str = s[1:]
     try:
-        val = float(val_str.replace(",", "").replace(".", "."))
-        # re-parse: remove US thousands comma first, then parse
-        val = float(val_str.replace(",", ""))
+        val = float(s.replace(",", ""))
         us_fmt = f"{val:,.2f}"                                   # "2,349.00"
         vn_fmt = us_fmt.replace(",", "X").replace(".", ",").replace("X", ".")  # "2.349,00"
-        return prefix + vn_fmt
+        return vn_fmt
     except ValueError:
         return s
 
@@ -69,8 +61,6 @@ def _to_number(val):
         return val
 
 
-def _is_uncertain(val) -> bool:
-    return isinstance(val, str) and val.startswith("?")
 
 
 def write_excel(items: list[dict], out_path) -> None:
@@ -120,24 +110,18 @@ def write_excel(items: list[dict], out_path) -> None:
             tong_float,
         ]
 
-        # Track which raw values were uncertain (for Tổng trị giá highlight)
-        uncertain_cols = set()
-        raw_vals = [
-            None,
-            item.get("ma_hang",       ""),
-            item.get("ma_hs",         ""),
-            item.get("ten_hang",      ""),
-            item.get("xuat_xu",       ""),
-            item.get("so_luong_1",    ""),
-            item.get("don_vi_tinh_1", ""),
-            item.get("so_luong_2",    ""),
-            item.get("don_vi_tinh_2", ""),
-            don_gia_raw,
-            tong_raw,
-        ]
-        for ci_check, rv in enumerate(raw_vals, 1):
-            if _is_uncertain(rv):
-                uncertain_cols.add(ci_check)
+        # Build set of column indices to highlight yellow (from AI's "uncertain" list)
+        _field_to_col = {
+            "ma_hang": 2, "ma_hs": 3, "ten_hang": 4, "xuat_xu": 5,
+            "so_luong_1": 6, "don_vi_tinh_1": 7,
+            "so_luong_2": 8, "don_vi_tinh_2": 9,
+            "don_gia": 10, "tong_tri_gia": 11,
+        }
+        uncertain_cols = {
+            _field_to_col[f]
+            for f in item.get("uncertain", [])
+            if f in _field_to_col
+        }
 
         for ci, val in enumerate(vals, 1):
             cell = ws.cell(row=ri, column=ci, value=val)
