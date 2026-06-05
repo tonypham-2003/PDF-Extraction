@@ -225,14 +225,16 @@ Parser return type — list of dicts with **exactly** these keys:
 ## Key Conventions
 
 - **Never use `xlrd` / `xlwt`** — `template.xls` is reference-only; all output is `.xlsx` via `openpyxl`.
-- **`tong_tri_gia`** is written as a float (numeric cell) to match template.xls `ctype=2`.
-- **`don_gia`** is written as a string to preserve comma formatting (e.g. `"2,349.00"`).
+- **`tong_tri_gia`** is written as a float (numeric cell) to match template.xls `ctype=2`, with `number_format = "#,##0.00"` (renders as `2.349,00` on Vietnamese Windows locale).
+- **`don_gia`** is written as a string in Vietnamese number format (e.g. `"2.349,00"`) — converted from US format by `_us_to_vn()` in `excel_writer.py`.
+- **Number format rule**: All numeric strings from AI (US format `2,349.00`) are converted to Vietnamese format `2.349,00` before writing to Excel. Applies to: `don_gia`, `so_luong_1`, `so_luong_2`, `tong_tri_gia` (display only).
+- **Uncertainty rule**: If AI is not confident about a value, it prefixes with `"?"` (e.g. `"?2349.00"`). `excel_writer.py` detects `?` prefix → highlights that cell **yellow** for manual review. The `?` is kept in the cell value as a visible marker.
 - **Do not add a merged title row** above the headers — template.xls starts directly with the header row.
 - **Sheet name must be `Sheet1`** (matches template.xls).
 - **Output file name** = `<pdf_stem>.xlsx` placed in `Output/<FOLDER>/`.
 - **Do not include grand-total / summary rows** from the source PDF in the item list.
 - **Số lượng 2 / Đơn vị tính 2** — leave blank unless the source document explicitly provides a secondary quantity/unit for the same line.
-- **ANTHROPIC_API_KEY** must be set in the environment before starting `app.py` for INV/PKL processing.
+- **GROQ_API_KEY** must be set in the environment (`.env` locally, Vercel env vars on production) for INV/PKL processing.
 
 ---
 
